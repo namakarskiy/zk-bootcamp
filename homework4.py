@@ -111,7 +111,7 @@ def verify(message: str, signature: Signature) -> bool:
         (part_b.x, part_b.y),
         field=curve.field
     )
-    return R_verify[0] == signature.r
+    return R_verify[0] == signature.r   
 
 
 def add_points(a: tuple[int, int] | None, b: tuple[int, int] | None, field: int) -> tuple[int, int] | None:
