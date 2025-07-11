@@ -25,7 +25,7 @@ The following identity will be handy:
 
 ```python
 pow(a, -1, curve_order) == pow(a, curve_order - 2, curve_order)
-​```
+```
 
 (This is Fermat’s little theorem, you can ask a chatbot AI to further explain this, but it isn’t necessary to understand this)
 To accomplish pow the precompile modExp may be handy.
