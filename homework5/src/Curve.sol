@@ -38,16 +38,17 @@ contract Curve {
 
         ECPoint[] memory actual = new ECPoint[](n);
         for (uint256 i = 0; i < n; i++) {
-            ECPoint memory sum = ecMul(s[0], matrix[i * n]);
+            ECPoint memory sum = ecMul(s[0], matrix[i * n] % CURVE_ORDER);
             for (uint256 j = 1; j < n; j++) {
-                ECPoint memory tmp = ecMul(s[j], matrix[i * n + j]);
+                uint256 scalar = matrix[i * n + j] % CURVE_ORDER;
+                ECPoint memory tmp = ecMul(s[j], scalar);
                 sum = ecAdd(sum, tmp);
             }
             actual[i] = sum;
         }
         ECPoint memory gen = ECPoint(XG, YG);
         for (uint256 i = 0; i < n; i++) {
-            ECPoint memory tmp = ecMul(gen, o[i]);
+            ECPoint memory tmp = ecMul(gen, o[i] % CURVE_ORDER);
             if (tmp.x != actual[i].x || tmp.y != actual[i].y) {
                 return false;
             }
