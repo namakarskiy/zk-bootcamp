@@ -1,0 +1,22 @@
+# OS-specific files
+.DS_Store
+
+# Build artifacts and output
+/target*
+out/
+snapshots/
+out.json
+
+# IDE/editor settings
+.idea
+.vscode
+
+# Forge/Foundry-specific
+.env
+cache/
+broadcast/
+lib/
+.keystore
+
+# Documentation
+docs/
