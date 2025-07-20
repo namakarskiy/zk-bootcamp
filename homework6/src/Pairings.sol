@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {console} from "forge-std/console.sol";
-
 struct G1Point {
     uint256 x;
     uint256 y;
@@ -14,6 +12,10 @@ struct G2Point {
     uint256 x2;
     uint256 y2;
 }
+
+error FieldOrderError(uint8, uint8);
+error PairingError();
+error EcMulError();
 
 contract Pairings {
     // alfa = 5 * G1
@@ -52,9 +54,9 @@ contract Pairings {
 
     G1Point _g = G1Point(1, 2);
 
-    uint256 _field_order =
+    uint256 constant _field_order =
         0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47;
-    uint256 _curve_order =
+    uint256 constant _curve_order =
         0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001;
 
     function verify(
@@ -86,35 +88,41 @@ contract Pairings {
             _delta
         );
         (bool result, bytes memory data) = address(8).staticcall(payload);
-        require(result, "pairing failed");
+        if (!result) revert PairingError();
         verified = abi.decode(data, (bool));
     }
 
-    function negate(G1Point memory point) public view returns (G1Point memory) {
+    function negate(
+        G1Point memory point
+    ) private pure returns (G1Point memory result) {
         uint256 neg_y = _field_order - (point.y % _field_order);
-        point.y = neg_y;
-        return point;
+        result = G1Point(point.x, neg_y);
     }
 
     function ecMul(
         G1Point memory point,
         uint256 scalar
     ) public view returns (G1Point memory result) {
-        bytes memory data = abi.encodePacked(point.x, point.y, scalar);
-        (bool ok, bytes memory encoded) = address(7).staticcall(data);
-        require(ok, "ecMul failed");
-        result = abi.decode(encoded, (G1Point));
+        uint256[3] memory payload;
+        payload[0] = point.x;
+        payload[1] = point.y;
+        payload[2] = scalar;
+        bool success;
+        assembly {
+            success := staticcall(gas(), 0x07, payload, 0x60, result, 0x40)
+        }
+        if (!success) revert EcMulError();
     }
 
-    function validateG1Point(G1Point memory point) private view {
-        require(point.x <= _field_order, "G1: x > field_order");
-        require(point.y <= _field_order, "G1: y > field_order");
+    function validateG1Point(G1Point memory point) private pure {
+        if (point.x > _field_order) revert FieldOrderError(1, 0);
+        if (point.y > _field_order) revert FieldOrderError(1, 1);
     }
 
-    function validateG2Point(G2Point memory point) private view {
-        require(point.x1 <= _field_order, "G2: x1 > field_order");
-        require(point.y1 <= _field_order, "G2: y1 > field_order");
-        require(point.x2 <= _field_order, "G2: x2 > field_order");
-        require(point.y2 <= _field_order, "G2: y2 > field_order");
+    function validateG2Point(G2Point memory point) private pure {
+        if (point.x1 > _field_order) revert FieldOrderError(2, 0);
+        if (point.y1 > _field_order) revert FieldOrderError(2, 1);
+        if (point.x2 > _field_order) revert FieldOrderError(2, 2);
+        if (point.y1 > _field_order) revert FieldOrderError(2, 3);
     }
 }
