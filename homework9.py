@@ -38,8 +38,8 @@ def matrices(
         for col in range(len(mt[0])):
             coeffs = []
             for row in range(len(mt)):
-                coeffs.append(mt[row][col])
-            result += lagrange_poly(xs, field(coeffs)) * vector[col]
+                coeffs.append(mt[row][col] % field.order)
+            result += lagrange_poly(xs, field(coeffs)) * (vector[col] % field.order)
         return result
 
     mt1_poly = to_poly(mt1, vec)
@@ -92,6 +92,21 @@ def test_check_vectors(a: list[int], b: list[int], result: bool) -> None:
             [1, 2, 7],
             False,
         ),
+        (
+            [
+                [1, -2, 3],
+                [4, -5, 6],
+                [7, -8, 9],
+            ],
+            [
+                [1, -2, 3],
+                [4, -5, 6],
+                [7, -8, 9],
+            ],
+            [1, 2, 7],
+            True,
+
+        )
     ],
 )
 def test_check_matrices(
