@@ -15,8 +15,8 @@ def vectors(vec1: list[int], vec2: list[int], field: GF) -> bool:
     Assume that they evaluate their polynomials honestly. Write the code they would use to turn their vector into a polynomial over a finite field.
     """
     xs = field(list(range(len(vec1))))
-    first = lagrange_poly(xs, field(vec1))
-    second = lagrange_poly(xs, field(vec2))
+    first = lagrange_poly(xs, field([x % field.order for x in vec1]))
+    second = lagrange_poly(xs, field([x % field.order for x in vec2]))
     tau = random.randint(1, field.order)
     return first(tau) == second(tau)
 
@@ -54,6 +54,7 @@ def matrices(
         ([1, 2, 3], [1, 2, 3], True),
         ([1, 2, 3], [1, 2, 4], False),
         ([0, 0, 0], [1, 2, 4], False),
+        ([-1, 107, 4], [-1, 107, 4], True),
     ],
 )
 def test_check_vectors(a: list[int], b: list[int], result: bool) -> None:
