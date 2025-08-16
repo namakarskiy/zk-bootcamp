@@ -216,6 +216,4 @@ def test_subset_sum():
 
 
 if __name__ == "__main__":
-    import pytest
-
     pytest.main([__file__])
