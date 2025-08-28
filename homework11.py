@@ -14,6 +14,7 @@ from py_ecc.bn128 import (
     G2,
     FQ,
     FQ2,
+    final_exponentiate,
 )
 import galois
 import pytest
@@ -24,7 +25,7 @@ type TauG2 = tuple[FQ2, ...]
 
 
 FIELD = galois.GF(
-    21888242871839275222246405745257275088548364400416034343698204186575808495617,
+    curve_order,
     primitive_element=5,
     verify=False,
 )
@@ -36,7 +37,6 @@ def powers_of_tau(
     constraints: int, interpolation_set: int
 ) -> tuple[TauG1, TauG2, TauG1]:
     tau = random.randint(1, curve_order)
-    # import pdb; pdb.set_trace()
     powers_of_tau_g1 = tuple(
         multiply(G1, tau**x) for x in range(constraints - 1, -1, -1)
     )
@@ -72,7 +72,9 @@ def to_poly(
 
 def at_tau_g(coefficients: galois.Array, tau_g: TauG1 | TauG2) -> FQ | FQ2:
     assert len(coefficients) == len(tau_g), "coefficients size is not equal"
-    return functools.reduce(add, map(multiply, tau_g, [int(x) for x in coefficients]))
+    return functools.reduce(
+        add, map(multiply, tau_g, [int(x) for x in coefficients])
+    )
 
 
 def prove(
@@ -95,7 +97,6 @@ def prove(
     if not allow_fake_proof:
         remainder = (A_poly * B_poly - O_poly) % T_poly
         assert remainder == galois.Poly.Zero(field=FIELD), "can't construct h_poly"
-
     A_at_tau_g1 = at_tau_g(A_poly.coefficients(order="desc", size=constraints), tau_g1)
     B_at_tau_g2 = at_tau_g(B_poly.coefficients(order="desc", size=constraints), tau_g2)
     O_at_tau_g1 = at_tau_g(O_poly.coefficients(order="desc", size=constraints), tau_g1)
@@ -107,7 +108,9 @@ def prove(
 
 
 def verify(A_g1: FQ, B_g2: FQ2, C_g1: FQ) -> bool:
-    return pairing(B_g2, A_g1) == pairing(G2, C_g1)
+    return final_exponentiate(pairing(B_g2, A_g1)) == final_exponentiate(
+        pairing(G2, C_g1)
+    )
 
 
 class Color(IntEnum):
