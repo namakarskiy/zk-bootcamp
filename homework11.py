@@ -4,6 +4,7 @@ Implement encrypted QAP with trusted setup
 
 from enum import IntEnum
 import functools
+import typing
 import random
 from py_ecc.bn128 import (
     curve_order,
@@ -20,8 +21,12 @@ import galois
 import pytest
 
 type Matrix = list[list[int]]
-type TauG1 = tuple[FQ, ...]
-type TauG2 = tuple[FQ2, ...]
+
+# Elliptic curve points can be None (point at infinity)
+type G1Point = tuple[FQ, FQ] | None
+type G2Point = tuple[FQ2, FQ2] | None
+type TauG1 = tuple[G1Point, ...]
+type TauG2 = tuple[G2Point, ...]
 
 
 FIELD = galois.GF(
@@ -34,7 +39,7 @@ random.seed(100500)
 
 
 def powers_of_tau(
-    constraints: int, interpolation_set: int
+    constraints: int, interpolation_set: tuple[int, ...]
 ) -> tuple[TauG1, TauG2, TauG1]:
     tau = random.randint(1, curve_order)
     powers_of_tau_g1 = tuple(
@@ -43,7 +48,7 @@ def powers_of_tau(
     powers_of_tau_g2 = tuple(
         multiply(G2, tau**x) for x in range(constraints - 1, -1, -1)
     )
-    t_of_tau = galois.Poly.Roots(interpolation_set, field=FIELD)(tau)
+    t_of_tau = galois.Poly.Roots(FIELD(interpolation_set), field=FIELD)(tau)
     t_of_tau_g1 = tuple(
         multiply(G1, int(t_of_tau) * tau**x) for x in range(constraints - 2, -1, -1)
     )
@@ -59,7 +64,7 @@ def build_interpolation_set(constraints: int) -> tuple[int, ...]:
 def to_poly(
     matrix: Matrix,
     witness: list[int],
-    interpolation_set: list[int],
+    interpolation_set: list[int] | galois.Array,
 ) -> galois.Poly:
     result = galois.Poly.Zero(field=FIELD)
     for col in range(len(matrix[0])):
@@ -70,7 +75,7 @@ def to_poly(
     return result
 
 
-def at_tau_g(coefficients: galois.Array, tau_g: TauG1 | TauG2) -> FQ | FQ2:
+def at_tau_g(coefficients: galois.Array, tau_g: TauG1 | TauG2) -> G1Point | G2Point:
     assert len(coefficients) == len(tau_g), "coefficients size is not equal"
     return functools.reduce(
         add, map(multiply, tau_g, [int(x) for x in coefficients])
@@ -80,34 +85,34 @@ def at_tau_g(coefficients: galois.Array, tau_g: TauG1 | TauG2) -> FQ | FQ2:
 def prove(
     A: Matrix,
     B: Matrix,
-    O: Matrix,
+    C: Matrix,
     witness: list[int],
     tau_g1: TauG1,
     tau_g2: TauG2,
     t_of_tau_g1: TauG1,
     interpolation_set: galois.Array,
     allow_fake_proof: bool = False,
-) -> tuple[FQ, FQ2, FQ]:
+) -> tuple[G1Point, G2Point, G1Point]:
     constraints = len(A)
     A_poly = to_poly(A, witness, interpolation_set)
     B_poly = to_poly(B, witness, interpolation_set)
-    O_poly = to_poly(O, witness, interpolation_set)
+    O_poly = to_poly(C, witness, interpolation_set)
     T_poly = galois.Poly.Roots(interpolation_set)
     h_poly = (A_poly * B_poly - O_poly) // T_poly
     if not allow_fake_proof:
         remainder = (A_poly * B_poly - O_poly) % T_poly
         assert remainder == galois.Poly.Zero(field=FIELD), "can't construct h_poly"
-    A_at_tau_g1 = at_tau_g(A_poly.coefficients(order="desc", size=constraints), tau_g1)
-    B_at_tau_g2 = at_tau_g(B_poly.coefficients(order="desc", size=constraints), tau_g2)
-    O_at_tau_g1 = at_tau_g(O_poly.coefficients(order="desc", size=constraints), tau_g1)
-    HT_at_tau_g1 = at_tau_g(
+    A_at_tau_g1 = typing.cast(G1Point, at_tau_g(A_poly.coefficients(order="desc", size=constraints), tau_g1))
+    B_at_tau_g2 = typing.cast(G2Point, at_tau_g(B_poly.coefficients(order="desc", size=constraints), tau_g2))
+    O_at_tau_g1 = typing.cast(G1Point, at_tau_g(O_poly.coefficients(order="desc", size=constraints), tau_g1))
+    HT_at_tau_g1 = typing.cast(G1Point, at_tau_g(
         h_poly.coefficients(order="desc", size=constraints - 1), t_of_tau_g1
-    )
-    C_at_tau_g1 = add(O_at_tau_g1, HT_at_tau_g1)
+    ))
+    C_at_tau_g1 = typing.cast(G1Point, add(O_at_tau_g1, HT_at_tau_g1))
     return A_at_tau_g1, B_at_tau_g2, C_at_tau_g1
 
 
-def verify(A_g1: FQ, B_g2: FQ2, C_g1: FQ) -> bool:
+def verify(A_g1: G1Point, B_g2: G2Point, C_g1: G1Point) -> bool:
     return final_exponentiate(pairing(B_g2, A_g1)) == final_exponentiate(
         pairing(G2, C_g1)
     )
@@ -170,7 +175,7 @@ def test_qap_at_points_3_coloring(color1: Color, color2: Color, expected: bool) 
         [0, 0, 1, 0, 0, 0, 0],
         [0, 0, 1, 0, 0, 0, 0],
     ]
-    O = [
+    С = [
         [0, 0, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 1, 0, 0],
         [-36, 0, 0, 0, 0, 0, 0],
@@ -185,7 +190,7 @@ def test_qap_at_points_3_coloring(color1: Color, color2: Color, expected: bool) 
     Ag1, Bg2, Cg1 = prove(
         A,
         B,
-        O,
+        С,
         witness,
         tau_g1,
         tau_g2,
@@ -220,14 +225,14 @@ def test_qap_at_points_3_some_function(
 
     A = [[0, 0, 3, 0, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0]]
     B = [[0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 5, 0, 0]]
-    O = [[0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1], [-3, 1, 1, 2, 0, -1]]
+    С = [[0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1], [-3, 1, 1, 2, 0, -1]]
     constraints = len(A)
     interpolation_set = build_interpolation_set(constraints)
     tau_g1, tau_g2, t_of_tau_g1 = powers_of_tau(constraints, interpolation_set)
     Ag1, Bg2, Cg1 = prove(
         A,
         B,
-        O,
+        С,
         witness,
         tau_g1,
         tau_g2,

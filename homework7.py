@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import pytest
 
 
-def at_least_one_is_zero_circuit(signals: list[int]) -> bool:
+def at_least_one_is_zero_circuit(signals: list[int]) -> None:
     """
     Create an arithmetic circuit that takes signals x₁, x₂, …, xₙ and is satisfied if at least one signal is 0.
     """
@@ -60,7 +60,7 @@ class Node:
     value: str
 
 
-def graph_is_bipartite(graph: dict[int, list[int]]):
+def graph_is_bipartite(graph: dict[Node, list[Node]]) -> None:
     """
     A bipartite graph is a graph that can be colored with two colors such that no two neighboring nodes share the same color.
     Devise an arithmetic circuit scheme to show you have a valid witness of a 2-coloring of a graph.
@@ -200,7 +200,7 @@ def test_power_of_2():
 # ==========
 
 
-def is_subset_sum(k: int, subset: list[int], switches: list[int]):
+def is_subset_sum(k: int, subset: list[int], switches: list[int]) -> None:
     """
     Create an arithmetic circuit that models the Subset sum problem. Given a set of integers (assume they are all non-negative), determine if there is a subset that sums to a given value
     """

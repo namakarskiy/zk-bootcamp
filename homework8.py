@@ -1,3 +1,4 @@
+from typing import Sequence
 import pytest
 from enum import IntEnum
 import itertools
@@ -31,7 +32,7 @@ def hadamard(vec1: list[int], vec2: list[int]) -> list[int]:
     return result
 
 
-type ECPointList = list[FQ | FQ2]
+type ECPointList = list[tuple[FQ, FQ]] | list[tuple[FQ2, FQ2]]
 
 
 def matrix_vec_point(mt: list[list[int]], vec: ECPointList) -> ECPointList:
@@ -52,7 +53,7 @@ def hadamard_points(vec1: list[FQ], vec2: list[FQ2]) -> list[FQ12]:
     return result
 
 
-def vec_to_g(vec: list[int], g: FQ | FQ2) -> ECPointList:
+def vec_to_g(vec: Sequence[int], g: FQ | FQ2) -> ECPointList:
     result = [0] * len(vec)
     for i in range(len(vec)):
         result[i] = multiply(g, vec[i] % curve_order)
@@ -124,7 +125,7 @@ def graph_3_coloring_r1cs(w: list[int]) -> bool:
         [0, 0, 1, 0, 0, 0, 0],
         [0, 0, 1, 0, 0, 0, 0],
     ]
-    O = [
+    C = [
         [0, 0, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 1, 0, 0],
         [-36, 0, 0, 0, 0, 0, 0],
@@ -133,7 +134,7 @@ def graph_3_coloring_r1cs(w: list[int]) -> bool:
         [0, 0, 0, 0, 0, 0, 1],
         [6, 0, -11, 0, 0, 0, 6],
     ]
-    return hadamard(matrix_vec(L, w), matrix_vec(R, w)) == matrix_vec(O, w)
+    return hadamard(matrix_vec(L, w), matrix_vec(R, w)) == matrix_vec(C, w)
 
 
 def graph_3_coloring_r1cs_points(wG1: list[FQ], wG2: list[FQ2]) -> bool:
@@ -183,7 +184,7 @@ def graph_3_coloring_r1cs_points(wG1: list[FQ], wG2: list[FQ2]) -> bool:
         [0, 0, 1, 0, 0, 0, 0],
         [0, 0, 1, 0, 0, 0, 0],
     ]
-    O = [
+    C = [
         [0, 0, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 1, 0, 0],
         [-36, 0, 0, 0, 0, 0, 0],
@@ -194,7 +195,7 @@ def graph_3_coloring_r1cs_points(wG1: list[FQ], wG2: list[FQ2]) -> bool:
     ]
     return hadamard_points(
         matrix_vec_point(L, wG1), matrix_vec_point(R, wG2)
-    ) == hadamard_points(matrix_vec_point(O, wG1), [G2] * len(O[0]))
+    ) == hadamard_points(matrix_vec_point(C, wG1), [G2] * len(C[0]))
 
 
 @pytest.mark.parametrize("color", [Color.RED, Color.GREEN, Color.BLUE])

@@ -140,9 +140,9 @@ print(f"f(23) == 29 is {23 * slope + b == 29}")
 # Use this Stackoverflow answer as a starting point: https://stackoverflow.com/a/73434775
 
 GF = galois.GF(p)
-x = GF([0, 1, 2])
-y = GF([1, 2, 1])
+x_coords = GF([0, 1, 2])
+y_coords = GF([1, 2, 1])
 
-L = galois.lagrange_poly(x, y)
+L = galois.lagrange_poly(x_coords, y_coords)
 print("Lagrange polynomial:", L)
-print(f"L(x) at points is equal to [1,2,1] is {all(L(x) == [1,2,1])}")
+print(f"L(x) at points is equal to [1,2,1] is {all(L(x_coords) == [1,2,1])}")

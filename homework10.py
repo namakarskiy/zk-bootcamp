@@ -9,7 +9,7 @@ import pytest
 random.seed(100500)
 
 
-def qap_over_real_numbers(tau: int) -> None:
+def qap_over_real_numbers(tau: int) -> bool:
     """
     Convert the following R1CS into a QAP over real numbers, not a finite field
     import numpy as np
@@ -71,7 +71,7 @@ def qap_over_real_numbers(tau: int) -> None:
 
     def to_poly(
         mat: npt.NDArray[np.float64],
-        intepolation_set: list[int],
+intepolation_set: npt.NDArray[np.int64],
         witness: npt.NDArray[np.int64],
     ) -> np.poly1d:
         result = np.poly1d([])
@@ -103,7 +103,7 @@ def test_real_numbers_random_taus() -> None:
 # problem 2
 
 
-def qap_over_finite_field(tau: int, field: galois.GF) -> None:
+def qap_over_finite_field(tau: int, field: type[galois.FieldArray]) -> bool:
     """
     same as problem 1 but over finite field
     """

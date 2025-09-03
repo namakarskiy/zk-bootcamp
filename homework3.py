@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import galois
 
-type Point = PointAtInfinity | Point
+type Point = PointAtInfinity | RegularPoint
 
 GF = galois.GF(13)
 A = GF(8)
@@ -13,8 +13,8 @@ class PointAtInfinity:
 
 @dataclass(frozen=True, slots=True)
 class RegularPoint:
-    x: galois.GF
-    y: galois.GF
+    x: galois.FieldArray
+    y: galois.FieldArray
 
 
 def add_points(a: Point, b: Point) -> Point:
@@ -23,10 +23,10 @@ def add_points(a: Point, b: Point) -> Point:
     if isinstance(b, PointAtInfinity):
         return a
     if a == b:
-        def slope(point, _):
+        def slope(point: Point, _) -> galois.FieldArray:
             return (GF(3) * point.x ** 2 + A) / (GF(2) * a.y)  
     else:
-        def slope(a: Point, b: Point) -> int:
+        def slope(a: Point, b: Point) -> galois.FieldArray:
             return (b.y - a.y) / (b.x -  a.x)
     try:
         lmbd = slope(a, b)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     assert point3 == point
 
     gen = RegularPoint(GF(5), GF(6))
-    current = gen
+    current: Point = gen
     gen_point = False
     for x in range(20):
         current = add_points(current, gen)

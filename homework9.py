@@ -1,6 +1,6 @@
 import pytest
 import random
-from galois import GF, lagrange_poly, Poly
+from galois import GF, lagrange_poly, Poly, FieldArray
 
 random.seed(100500)
 FIELD_ORDER = 103
@@ -9,7 +9,7 @@ FIELD_ORDER = 103
 
 
 # ======== problem 1
-def vectors(vec1: list[int], vec2: list[int], field: GF) -> bool:
+def vectors(vec1: list[int], vec2: list[int], field: type[FieldArray]) -> bool:
     """
     Alice and Bob have two vectors, and they want to test if they are the same vector.
     Assume that they evaluate their polynomials honestly. Write the code they would use to turn their vector into a polynomial over a finite field.
@@ -23,7 +23,7 @@ def vectors(vec1: list[int], vec2: list[int], field: GF) -> bool:
 
 # ======== problem 2
 def matrices(
-    mt1: list[list[int]], mt2: list[list[int]], vec: list[int], field: GF
+mt1: list[list[int]], mt2: list[list[int]], vec: list[int], field: type[FieldArray]
 ) -> bool:
     """
     Alice and Bob have matrices A and B. They want to know if, for some v that
