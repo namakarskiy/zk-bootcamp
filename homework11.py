@@ -211,10 +211,6 @@ def test_qap_at_points_3_coloring(color1: Color, color2: Color, expected: bool) 
 def test_qap_at_points_3_some_function(
     x: int, y: int, noise: int, expected: bool
 ) -> None:
-    """
-    3 coloring problem from howework8
-    """
-
     # this is our orignal formula
     out = (
         3 * x * x * y + 5 * x * y - x - 2 * y + 3
