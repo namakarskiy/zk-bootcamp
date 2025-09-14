@@ -39,18 +39,18 @@ random.seed(100500)
 
 
 def powers_of_tau(
-    constraints: int, interpolation_set: tuple[int, ...]
+    n: int, interpolation_set: tuple[int, ...]
 ) -> tuple[TauG1, TauG2, TauG1]:
     tau = random.randint(1, curve_order)
     powers_of_tau_g1 = tuple(
-        multiply(G1, tau**x) for x in range(constraints - 1, -1, -1)
+        multiply(G1, tau**x) for x in range(n - 1, -1, -1)
     )
     powers_of_tau_g2 = tuple(
-        multiply(G2, tau**x) for x in range(constraints - 1, -1, -1)
+        multiply(G2, tau**x) for x in range(n - 1, -1, -1)
     )
     t_of_tau = galois.Poly.Roots(FIELD(interpolation_set), field=FIELD)(tau)
     t_of_tau_g1 = tuple(
-        multiply(G1, int(t_of_tau) * tau**x) for x in range(constraints - 2, -1, -1)
+        multiply(G1, int(t_of_tau) * tau**x) for x in range(n - 2, -1, -1)
     )
     return powers_of_tau_g1, powers_of_tau_g2, t_of_tau_g1
 
@@ -93,7 +93,9 @@ def prove(
     interpolation_set: galois.Array,
     allow_fake_proof: bool = False,
 ) -> tuple[G1Point, G2Point, G1Point]:
-    constraints = len(A)
+    m = len(A[0])
+    n = len(A)
+    assert m == len(witness)
     A_poly = to_poly(A, witness, interpolation_set)
     B_poly = to_poly(B, witness, interpolation_set)
     O_poly = to_poly(C, witness, interpolation_set)
@@ -102,11 +104,11 @@ def prove(
     if not allow_fake_proof:
         remainder = (A_poly * B_poly - O_poly) % T_poly
         assert remainder == galois.Poly.Zero(field=FIELD), "can't construct h_poly"
-    A_at_tau_g1 = typing.cast(G1Point, at_tau_g(A_poly.coefficients(order="desc", size=constraints), tau_g1))
-    B_at_tau_g2 = typing.cast(G2Point, at_tau_g(B_poly.coefficients(order="desc", size=constraints), tau_g2))
-    O_at_tau_g1 = typing.cast(G1Point, at_tau_g(O_poly.coefficients(order="desc", size=constraints), tau_g1))
+    A_at_tau_g1 = typing.cast(G1Point, at_tau_g(A_poly.coefficients(order="desc", size=n), tau_g1))
+    B_at_tau_g2 = typing.cast(G2Point, at_tau_g(B_poly.coefficients(order="desc", size=n), tau_g2))
+    O_at_tau_g1 = typing.cast(G1Point, at_tau_g(O_poly.coefficients(order="desc", size=n), tau_g1))
     HT_at_tau_g1 = typing.cast(G1Point, at_tau_g(
-        h_poly.coefficients(order="desc", size=constraints - 1), t_of_tau_g1
+        h_poly.coefficients(order="desc", size=n - 1), t_of_tau_g1
     ))
     C_at_tau_g1 = typing.cast(G1Point, add(O_at_tau_g1, HT_at_tau_g1))
     return A_at_tau_g1, B_at_tau_g2, C_at_tau_g1

@@ -1,9 +1,8 @@
 """
-Implement encrypted Groth16 without public input
+Implement encrypted Groth16 with public input
 """
 
 from dataclasses import dataclass
-from enum import IntEnum
 import functools
 import typing
 import random
@@ -54,9 +53,12 @@ class TrustedSetup:
     t_of_tau_g1: TauG1
     alfa_g1: G1Point
     beta_g2: G2Point
+    delta_g2: G2Point
+    gamma_g2: G2Point
     psi: tuple[G1Point, ...]
     tau_g1: G1Point
     tau_g2: G2Point
+    l: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,32 +73,46 @@ class Polinomials:
 
 def prepare_trusted_setup(
     interpolation_set: tuple[int, ...],
-    polinomilas: Polinomials,
+    polynomials: Polinomials,
+    l: int
 ) -> TrustedSetup:
     tau = random.randint(1, curve_order)
     alfa = random.randint(1, curve_order)
     beta = random.randint(1, curve_order)
+    delta = random.randint(1, curve_order)
+    gamma = random.randint(1, curve_order)
     powers_of_tau_g1 = tuple(
-        multiply(G1, tau**x) for x in range(polinomilas.n - 1, -1, -1)
+        multiply(G1, tau**x) for x in range(polynomials.n - 1, -1, -1)
     )
     powers_of_tau_g2 = tuple(
-        multiply(G2, tau**x) for x in range(polinomilas.n - 1, -1, -1)
+        multiply(G2, tau**x) for x in range(polynomials.n - 1, -1, -1)
     )
     t_of_tau = galois.Poly.Roots(interpolation_set, field=FIELD)(tau)
+    
     t_of_tau_g1 = tuple(
-        multiply(G1, int(t_of_tau) * tau**x) for x in range(polinomilas.n - 2, -1, -1)
+        multiply(G1, int(t_of_tau * tau**x / FIELD(delta))) for x in range(polynomials.n - 2, -1, -1)
     )
     psi = []
     assert (
-        len(polinomilas.a_polys) == len(polinomilas.b_polys) == len(polinomilas.c_polys)
+        len(polynomials.a_polys) == len(polynomials.b_polys) == len(polynomials.c_polys)
     )
-    for idx in range(polinomilas.m):
+
+    for idx in range(l):
         psi_i = (
-            polinomilas.a_polys[idx](tau) * beta
-            + polinomilas.b_polys[idx](tau) * alfa
-            + polinomilas.c_polys[idx]
+            polynomials.a_polys[idx](tau) * beta
+            + polynomials.b_polys[idx](tau) * alfa
+            + polynomials.c_polys[idx]
         )
-        psi.append(multiply(G1, int(psi_i(tau))))
+        psi.append(multiply(G1, int(psi_i(tau) / FIELD(gamma))))
+
+    for idx in range(l, polynomials.m):
+        psi_i = (
+            polynomials.a_polys[idx](tau) * beta
+            + polynomials.b_polys[idx](tau) * alfa
+            + polynomials.c_polys[idx]
+        )  
+        psi.append(multiply(G1, int(psi_i(tau) / FIELD(delta))))
+
     return TrustedSetup(
         powers_of_tau_g1=powers_of_tau_g1,
         powers_of_tau_g2=powers_of_tau_g2,
@@ -106,6 +122,9 @@ def prepare_trusted_setup(
         psi=tuple(psi),
         tau_g1=multiply(G1, tau),
         tau_g2=multiply(G2, tau),
+        delta_g2=multiply(G2, delta),
+        gamma_g2=multiply(G2, gamma),
+        l=l,
     )
 
 
@@ -129,7 +148,7 @@ def to_polys(
 
 
 def prepare_polinomials(
-    A: Matrix, B: Matrix, C: Matrix, interpolation_set, m: int, n: int
+    A: Matrix, B: Matrix, C: Matrix, interpolation_set: galois.Array, m: int, n: int
 ) -> Polinomials:
     a_polys = to_polys(A, interpolation_set)
     b_polys = to_polys(B, interpolation_set)
@@ -198,8 +217,8 @@ def prove(
         ),
     )
     h_poly = calculate_h(a_poly, b_poly, c_poly, polynomials.t_poly)
-    psi = functools.reduce(add, map(lambda x, y: multiply(x, y), ts.psi, witness))
-
+    psi = functools.reduce(add, map(lambda x, y: multiply(x, y), ts.psi[ts.l:], witness[ts.l:]))
+    
     ht_at_tau_g1 = typing.cast(
         G1Point,
         at_tau_g(
@@ -211,89 +230,11 @@ def prove(
     return a_at_tau_g1, b_at_tau_g2, c_at_tau_g1
 
 
-def verify(A_g1: G1Point, B_g2: G2Point, C_g1: G1Point, ts: TrustedSetup) -> bool:
+def verify(A_g1: G1Point, B_g2: G2Point, C_g1: G1Point, ts: TrustedSetup, public: list[int]) -> bool:
+    x1 = functools.reduce(add, map(multiply, ts.psi[:ts.l], public))
     return final_exponentiate(pairing(B_g2, A_g1)) == final_exponentiate(
-        pairing(G2, C_g1) * pairing(ts.beta_g2, ts.alfa_g1)
+        pairing(ts.delta_g2, C_g1) * pairing(ts.beta_g2, ts.alfa_g1) * pairing(ts.gamma_g2, x1)
     )
-
-
-class Color(IntEnum):
-    RED = 1
-    BLUE = 2
-    GREEN = 3
-    NOT_EXISTS_PURPLE = 4
-    NOT_EXISTS_ORANGE = 5
-
-@pytest.mark.parametrize(
-    "color1,color2,expected",
-    [
-        (Color.RED, Color.BLUE, True),
-        (Color.RED, Color.GREEN, True),
-        (Color.RED, Color.NOT_EXISTS_PURPLE, False),
-        (Color.RED, Color.NOT_EXISTS_ORANGE, False),
-        (Color.RED, Color.RED, False),
-        (Color.GREEN, Color.BLUE, True),
-        (Color.GREEN, Color.GREEN, False),
-        (Color.GREEN, Color.NOT_EXISTS_PURPLE, False),
-        (Color.GREEN, Color.NOT_EXISTS_ORANGE, False),
-        (Color.GREEN, Color.RED, True),
-        (Color.BLUE, Color.BLUE, False),
-        (Color.BLUE, Color.GREEN, True),
-        (Color.BLUE, Color.NOT_EXISTS_PURPLE, False),
-        (Color.BLUE, Color.NOT_EXISTS_ORANGE, False),
-        (Color.BLUE, Color.RED, True),
-    ],
-)
-def test_qap_at_points_3_coloring(color1: Color, color2: Color, expected: bool) -> None:
-    """
-    3 coloring problem from howework8
-    """
-    x = color1.value
-    y = color2.value
-    a = x * y
-    b = a * a
-    c = x * x
-    d = y * y
-    witness = [1, x, y, a, b, c, d]
-    A = [
-        [0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1],
-    ]
-    B = [
-        [0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0],
-        [-36, 0, 0, 11, -1, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0],
-    ]
-    С = [
-        [0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 0],
-        [-36, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0],
-        [6, -11, 0, 0, 0, 6, 0],
-        [0, 0, 0, 0, 0, 0, 1],
-        [6, 0, -11, 0, 0, 0, 6],
-    ]
-    m = len(A[0])
-    constraints = len(A)
-    interpolation_set = build_interpolation_set(constraints)
-    polynomials = prepare_polinomials(A, B, С, interpolation_set, m, constraints)
-    ts = prepare_trusted_setup(tuple(interpolation_set), polynomials)
-    Ag1, Bg2, Cg1 = prove(
-        polynomials,
-        witness,
-        ts,
-        allow_fake_proof=True,
-    )
-    assert verify(Ag1, Bg2, Cg1, ts) == expected
 
 
 @pytest.mark.parametrize(
@@ -313,22 +254,23 @@ def test_qap_at_points_3_some_function(
     v1 = 3 * x * x
     v2 = v1 * y
     witness = [1, out, x, y + noise, v1, v2]
+    public_input = witness[:2]
 
     A = [[0, 0, 3, 0, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 0]]
     B = [[0, 0, 1, 0, 0, 0], [0, 0, 0, 1, 0, 0], [0, 0, 0, 5, 0, 0]]
     С = [[0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1], [-3, 1, 1, 2, 0, -1]]
-    m = len(A[0])
     constraints = len(A)
+    m = len(A[0])
     interpolation_set = build_interpolation_set(constraints)
     polynomials = prepare_polinomials(A, B, С, interpolation_set, m, constraints)
-    ts = prepare_trusted_setup(tuple(interpolation_set), polynomials)
+    ts = prepare_trusted_setup(tuple(interpolation_set), polynomials, len(public_input))
     Ag1, Bg2, Cg1 = prove(
         polynomials,
         witness,
         ts,
         allow_fake_proof=True,
     )
-    assert verify(Ag1, Bg2, Cg1, ts) == expected
+    assert verify(Ag1, Bg2, Cg1, ts, public_input) == expected
 
 
 if __name__ == "__main__":
